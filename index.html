@@ -26,18 +26,24 @@ body{padding:20px;}
 .container{height:calc(100vh - 40px);justify-content:center;}
 .viewer{flex:1 1 auto;min-height:0;height:auto;}
 }
-.slide{width:100%;height:100%;display:none;}
+.slide{width:100%;height:100%;display:none;align-items:center;justify-content:center;}
 .slide.active{display:flex;}
-.page-stack{width:100%;height:100%;display:flex;flex-direction:column;gap:6px;}
-.page-stack img{width:100%;flex:1 1 0;min-height:0;object-fit:contain;}
+.slide img{width:100%;height:100%;object-fit:contain;}
+
+.video-wrap{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#000;}
+.video-wrap video{width:100%;height:100%;object-fit:contain;}
+.play-btn{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,.92);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.2s;box-shadow:0 4px 20px rgba(0,0,0,.4);}
+.play-btn:hover{transform:translate(-50%,-50%) scale(1.08);background:#fff;}
+.play-btn.hidden{display:none;}
+.play-btn svg{width:30px;height:30px;margin-left:4px;}
+
 .controls{display:flex;align-items:center;gap:20px;}
 button{padding:14px 28px;border:none;border-radius:10px;cursor:pointer;font-size:16px;background:white;color:black;transition:.2s;}
 button:hover{opacity:.8;transform:translateY(-2px);}
 .page{opacity:.8;font-size:15px;}
 .fullscreen{position:fixed;inset:0;background:black;display:none;justify-content:center;align-items:center;z-index:9999;}
 .fullscreen.active{display:flex;}
-.fullscreen .page-stack{width:100%;height:100%;display:flex;flex-direction:column;gap:6px;}
-.fullscreen .page-stack img{width:100%;flex:1 1 0;min-height:0;object-fit:contain;}
+.fullscreen img{width:100%;height:100%;object-fit:contain;}
 .close-btn{position:absolute;top:20px;right:20px;background:white;color:black;border:none;padding:10px 16px;border-radius:10px;cursor:pointer;z-index:10000;}
 </style>
 </head>
@@ -68,56 +74,72 @@ button:hover{opacity:.8;transform:translateY(-2px);}
 
 <div class="fullscreen" id="fullscreen">
 <button class="close-btn" id="closeBtn">閉じる</button>
-<div class="page-stack" id="fullscreenStack"></div>
+<img id="fullscreenImage">
 </div>
 
 <script>
 /* ============================================
-   ★ 写真を増やす・構成を変えるときはここだけ変更すればOK ★
+   ★ ここだけ変更すればOK ★
 
-   images フォルダには「ページ番号-枚数」の形式で入れます。
-     例) 1ページ目が見開き2枚(縦2枚を上下に表示)なら
-         images/1-1.jpg, images/1-2.jpg
-         2ページ目が1枚だけなら
-         images/2-1.jpg
+   DEMO_VIDEO: 一番最初に表示する、デモリール動画のファイル名
+              (videos フォルダに入れてください)
 
-   PAGES 配列は「各ページに画像が何枚あるか」を順番に並べます。
-   例: [2, 1, 2, 1] → 1ページ目=2枚(縦積み), 2ページ目=1枚,
-                      3ページ目=2枚(縦積み), 4ページ目=1枚
-   数字を増やしたり配列に追加したりするだけで、
-   何ページ・何枚構成でも自動で反映されます。
+   PHOTO_COUNT: デモ動画の後に続く写真の枚数
+               (images フォルダに 01.jpg, 02.jpg... の連番で入れてください)
    ============================================ */
-const PAGES = [2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1];
-const EXT = "jpg";   // 拡張子(jpg / png / jpeg など)
+const DEMO_VIDEO = "videos/demo.mp4";
+const PHOTO_COUNT = 22;
+const EXT = "jpg";
+const PAD = 2;
 /* ============================================ */
 
 const viewer = document.getElementById('viewer');
-const pageImagePaths = []; // フルスクリーン用に各ページの画像パス一覧を保持
+const PLAY_ICON = '<svg viewBox="0 0 24 24" fill="black"><path d="M8 5v14l11-7z"/></svg>';
 
-PAGES.forEach((count, pIndex) => {
-  const pageNum = pIndex + 1;
-  const slide = document.createElement('div');
-  slide.className = 'slide' + (pageNum === 1 ? ' active' : '');
+// --- 1ページ目: デモリール動画(再生ボタン付き) ---
+const demoSlide = document.createElement('div');
+demoSlide.className = 'slide active';
 
-  const stack = document.createElement('div');
-  stack.className = 'page-stack';
+const videoWrap = document.createElement('div');
+videoWrap.className = 'video-wrap';
 
-  const paths = [];
-  for (let s = 1; s <= count; s++) {
-    const path = `images/${pageNum}-${s}.${EXT}`;
-    paths.push(path);
-    const img = document.createElement('img');
-    img.src = path;
-    img.loading = 'lazy';
-    stack.appendChild(img);
-  }
-  pageImagePaths.push(paths);
+const demoVideoEl = document.createElement('video');
+demoVideoEl.src = DEMO_VIDEO;
+demoVideoEl.playsInline = true;
+demoVideoEl.setAttribute('playsinline', '');
 
-  slide.appendChild(stack);
-  viewer.appendChild(slide);
+const playBtn = document.createElement('div');
+playBtn.className = 'play-btn';
+playBtn.innerHTML = PLAY_ICON;
+
+// 動画エリアのクリックは全画面表示に伝えない(再生ボタン操作を優先)
+videoWrap.addEventListener('click', (e) => e.stopPropagation());
+playBtn.addEventListener('click', () => {
+  demoVideoEl.controls = true;
+  demoVideoEl.play();
 });
+demoVideoEl.addEventListener('play', () => playBtn.classList.add('hidden'));
+demoVideoEl.addEventListener('pause', () => playBtn.classList.remove('hidden'));
+demoVideoEl.addEventListener('ended', () => playBtn.classList.remove('hidden'));
 
-document.getElementById('pageTotal').textContent = PAGES.length;
+videoWrap.appendChild(demoVideoEl);
+videoWrap.appendChild(playBtn);
+demoSlide.appendChild(videoWrap);
+viewer.appendChild(demoSlide);
+
+// --- 2ページ目以降: 写真 ---
+for (let i = 1; i <= PHOTO_COUNT; i++) {
+  const num = String(i).padStart(PAD, "0");
+  const slide = document.createElement('div');
+  slide.className = 'slide';
+  const img = document.createElement('img');
+  img.src = `images/${num}.${EXT}`;
+  img.loading = 'lazy';
+  slide.appendChild(img);
+  viewer.appendChild(slide);
+}
+
+document.getElementById('pageTotal').textContent = PHOTO_COUNT + 1;
 
 const loading=document.getElementById("loading");
 const intro=document.getElementById("intro");
@@ -147,24 +169,16 @@ document.body.style.overflow="auto";
 const slides=document.querySelectorAll('.slide');
 const pageNumber=document.getElementById('pageNumber');
 const fullscreen=document.getElementById('fullscreen');
-const fullscreenStack=document.getElementById('fullscreenStack');
+const fullscreenImage=document.getElementById('fullscreenImage');
 let currentIndex=0;
-
-function renderFullscreenStack(index){
-fullscreenStack.innerHTML='';
-pageImagePaths[index].forEach(path=>{
-const img=document.createElement('img');
-img.src=path;
-fullscreenStack.appendChild(img);
-});
-}
 
 function showSlide(index){
 slides.forEach(slide=>slide.classList.remove('active'));
 slides[index].classList.add('active');
 pageNumber.textContent=index+1;
-if(fullscreen.classList.contains('active')){
-renderFullscreenStack(index);
+const currentImg = slides[index].querySelector('img');
+if(fullscreen.classList.contains('active') && currentImg){
+fullscreenImage.src=currentImg.src;
 }
 }
 
@@ -180,8 +194,11 @@ if(currentIndex<0){currentIndex=slides.length-1;}
 showSlide(currentIndex);
 });
 
+// 写真ページのみクリックで全画面表示(デモ動画ページは再生ボタン操作のみ)
 viewer.addEventListener('click',()=>{
-renderFullscreenStack(currentIndex);
+const currentImg = slides[currentIndex].querySelector('img');
+if(!currentImg) return;
+fullscreenImage.src=currentImg.src;
 fullscreen.classList.add('active');
 });
 
