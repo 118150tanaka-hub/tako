@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portfolio</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#111;color:white;font-family:sans-serif;width:100%;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:40px;overflow:hidden;}
+#loading{position:fixed;top:0;left:0;width:100vw;height:100vh;background:black;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:30px;z-index:999999;opacity:1;visibility:visible;transition:opacity 1s ease,visibility 1s ease;}
+#loading.hide{opacity:0;visibility:hidden;pointer-events:none;}
+#loading video{width:630px;max-width:81vw;height:auto;object-fit:contain;}
+.loading-text{color:white;font-size:22px;font-weight:300;letter-spacing:6px;text-transform:uppercase;opacity:1;text-shadow:0 0 12px rgba(255,255,255,.7);animation:blink 1.2s infinite;}
+@keyframes blink{0%{opacity:.3;}50%{opacity:1;}100%{opacity:.3;}}
+#intro{position:fixed;inset:0;background:black;display:flex;justify-content:center;align-items:center;z-index:999998;opacity:0;visibility:hidden;transition:opacity 1s ease,visibility 1s ease;}
+#intro.show{opacity:1;visibility:visible;}
+#intro.hide{opacity:0;visibility:hidden;pointer-events:none;}
+.intro-box{text-align:center;color:white;}
+.intro-box p{font-size:24px;line-height:1.8;opacity:.7;font-weight:300;}
+.intro-box span{display:block;margin-top:30px;font-size:14px;letter-spacing:4px;opacity:.4;animation:blink 1.5s infinite;}
+.container{width:100%;max-width:1100px;display:flex;flex-direction:column;align-items:center;gap:20px;opacity:0;visibility:hidden;pointer-events:none;transition:opacity 1s ease,visibility 1s ease;}
+.container.show{opacity:1;visibility:visible;pointer-events:auto;}
+.viewer{width:100%;min-height:51vh;background:#222;border-radius:16px;overflow:hidden;position:relative;box-shadow:0 10px 40px rgba(0,0,0,.5);cursor:pointer;display:flex;justify-content:center;align-items:center;}
+@media(min-width:900px){
+body{padding:20px;}
+.container{height:calc(100vh - 40px);justify-content:center;}
+.viewer{flex:1 1 auto;min-height:0;height:auto;}
+}
+.slide{width:100%;height:100%;display:none;}
+.slide.active{display:flex;}
+.page-stack{width:100%;height:100%;display:flex;flex-direction:column;gap:6px;}
+.page-stack img{width:100%;flex:1 1 0;min-height:0;object-fit:contain;}
+.controls{display:flex;align-items:center;gap:20px;}
+button{padding:14px 28px;border:none;border-radius:10px;cursor:pointer;font-size:16px;background:white;color:black;transition:.2s;}
+button:hover{opacity:.8;transform:translateY(-2px);}
+.page{opacity:.8;font-size:15px;}
+.fullscreen{position:fixed;inset:0;background:black;display:none;justify-content:center;align-items:center;z-index:9999;}
+.fullscreen.active{display:flex;}
+.fullscreen .page-stack{width:100%;height:100%;display:flex;flex-direction:column;gap:6px;}
+.fullscreen .page-stack img{width:100%;flex:1 1 0;min-height:0;object-fit:contain;}
+.close-btn{position:absolute;top:20px;right:20px;background:white;color:black;border:none;padding:10px 16px;border-radius:10px;cursor:pointer;z-index:10000;}
+</style>
+</head>
+<body>
+
+<div id="loading">
+<video autoplay muted loop playsinline>
+<source src="videos/mahouf10.mp4" type="video/mp4">
+</video>
+<div class="loading-text">Loading...</div>
+</div>
+
+<div id="intro">
+<div class="intro-box">
+<p>クリックで全画面表示すると<br>矢印キーで操作できます</p>
+<span>Click Anywhere</span>
+</div>
+</div>
+
+<div class="container" id="container">
+<div class="viewer" id="viewer"></div>
+<div class="page"><span id="pageNumber">1</span> / <span id="pageTotal"></span></div>
+<div class="controls">
+<button id="prevBtn">戻る</button>
+<button id="nextBtn">進む</button>
+</div>
+</div>
+
+<div class="fullscreen" id="fullscreen">
+<button class="close-btn" id="closeBtn">閉じる</button>
+<div class="page-stack" id="fullscreenStack"></div>
+</div>
+
+<script>
+/* ============================================
+   ★ 写真を増やす・構成を変えるときはここだけ変更すればOK ★
+
+   images フォルダには「ページ番号-枚数」の形式で入れます。
+     例) 1ページ目が見開き2枚(縦2枚を上下に表示)なら
+         images/1-1.jpg, images/1-2.jpg
+         2ページ目が1枚だけなら
+         images/2-1.jpg
+
+   PAGES 配列は「各ページに画像が何枚あるか」を順番に並べます。
+   例: [2, 1, 2, 1] → 1ページ目=2枚(縦積み), 2ページ目=1枚,
+                      3ページ目=2枚(縦積み), 4ページ目=1枚
+   数字を増やしたり配列に追加したりするだけで、
+   何ページ・何枚構成でも自動で反映されます。
+   ============================================ */
+const PAGES = [2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1];
+const EXT = "jpg";   // 拡張子(jpg / png / jpeg など)
+/* ============================================ */
+
+const viewer = document.getElementById('viewer');
+const pageImagePaths = []; // フルスクリーン用に各ページの画像パス一覧を保持
+
+PAGES.forEach((count, pIndex) => {
+  const pageNum = pIndex + 1;
+  const slide = document.createElement('div');
+  slide.className = 'slide' + (pageNum === 1 ? ' active' : '');
+
+  const stack = document.createElement('div');
+  stack.className = 'page-stack';
+
+  const paths = [];
+  for (let s = 1; s <= count; s++) {
+    const path = `images/${pageNum}-${s}.${EXT}`;
+    paths.push(path);
+    const img = document.createElement('img');
+    img.src = path;
+    img.loading = 'lazy';
+    stack.appendChild(img);
+  }
+  pageImagePaths.push(paths);
+
+  slide.appendChild(stack);
+  viewer.appendChild(slide);
+});
+
+document.getElementById('pageTotal').textContent = PAGES.length;
+
+const loading=document.getElementById("loading");
+const intro=document.getElementById("intro");
+const container=document.getElementById("container");
+const loadingVideo=document.querySelector("#loading video");
+
+const MIN_DISPLAY_MS=4000;
+function goToIntro(){
+loading.classList.add("hide");
+intro.classList.add("show");
+}
+function startCountdownFromVideoReady(){
+setTimeout(goToIntro,MIN_DISPLAY_MS);
+}
+if(loadingVideo.readyState>=3){
+startCountdownFromVideoReady();
+}else{
+loadingVideo.addEventListener("canplaythrough",startCountdownFromVideoReady,{once:true});
+}
+
+intro.addEventListener("click",()=>{
+intro.classList.add("hide");
+container.classList.add("show");
+document.body.style.overflow="auto";
+});
+
+const slides=document.querySelectorAll('.slide');
+const pageNumber=document.getElementById('pageNumber');
+const fullscreen=document.getElementById('fullscreen');
+const fullscreenStack=document.getElementById('fullscreenStack');
+let currentIndex=0;
+
+function renderFullscreenStack(index){
+fullscreenStack.innerHTML='';
+pageImagePaths[index].forEach(path=>{
+const img=document.createElement('img');
+img.src=path;
+fullscreenStack.appendChild(img);
+});
+}
+
+function showSlide(index){
+slides.forEach(slide=>slide.classList.remove('active'));
+slides[index].classList.add('active');
+pageNumber.textContent=index+1;
+if(fullscreen.classList.contains('active')){
+renderFullscreenStack(index);
+}
+}
+
+document.getElementById('nextBtn').addEventListener('click',()=>{
+currentIndex++;
+if(currentIndex>=slides.length){currentIndex=0;}
+showSlide(currentIndex);
+});
+
+document.getElementById('prevBtn').addEventListener('click',()=>{
+currentIndex--;
+if(currentIndex<0){currentIndex=slides.length-1;}
+showSlide(currentIndex);
+});
+
+viewer.addEventListener('click',()=>{
+renderFullscreenStack(currentIndex);
+fullscreen.classList.add('active');
+});
+
+document.getElementById('closeBtn').addEventListener('click',()=>{
+fullscreen.classList.remove('active');
+});
+
+fullscreen.addEventListener('click',(e)=>{
+if(e.target===fullscreen){fullscreen.classList.remove('active');}
+});
+
+window.addEventListener('keydown',(e)=>{
+if(!fullscreen.classList.contains('active')) return;
+if(e.key==='ArrowRight'){
+currentIndex++;
+if(currentIndex>=slides.length){currentIndex=0;}
+showSlide(currentIndex);
+}
+if(e.key==='ArrowLeft'){
+currentIndex--;
+if(currentIndex<0){currentIndex=slides.length-1;}
+showSlide(currentIndex);
+}
+if(e.key==='Escape'){
+fullscreen.classList.remove('active');
+}
+});
+</script>
+</body>
+</html>
