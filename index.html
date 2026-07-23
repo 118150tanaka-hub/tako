@@ -24,11 +24,7 @@ body{background:#111;color:white;font-family:sans-serif;width:100%;min-height:10
 .container{width:100%;max-width:1100px;display:flex;flex-direction:column;align-items:center;gap:20px;opacity:0;visibility:hidden;pointer-events:none;transition:opacity 1s ease,visibility 1s ease;}
 .container.show{opacity:1;visibility:visible;pointer-events:auto;}
 .viewer{width:100%;min-height:51vh;background:#222;border-radius:16px;overflow:hidden;position:relative;box-shadow:0 10px 40px rgba(0,0,0,.5);cursor:pointer;display:flex;justify-content:center;align-items:center;}
-@media(min-width:900px){
-body{padding:20px;}
-.container{height:calc(100vh - 40px);justify-content:center;}
-.viewer{flex:1 1 auto;min-height:0;height:auto;}
-}
+@media(min-width:900px){body{padding:20px;} .container{height:calc(100vh - 40px);justify-content:center;} .viewer{flex:1 1 auto;min-height:0;height:auto;}}
 .slide{width:100%;height:100%;display:none;align-items:center;justify-content:center;}
 .slide.active{display:flex;}
 .slide img{width:100%;height:100%;object-fit:contain;}
@@ -45,7 +41,6 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none;}
 </style>
 </head>
 <body>
-
 <div id="loading">
 <div class="loading-media">
 <video id="loadingVideo" autoplay muted loop playsinline>
@@ -218,37 +213,39 @@ nextBtn.disabled = true;
 prevBtn.disabled = true;
 buildSlidesFromPdf();
 
-const loading=document.getElementById("loading");
-const intro=document.getElementById("intro");
-const container=document.getElementById("container");
-const loadingVideo=document.getElementById("loadingVideo");
-const loadingVideoFallback=document.getElementById("loadingVideoFallback");
+const loading = document.getElementById('loading');
+const intro = document.getElementById('intro');
+const container = document.getElementById('container');
+const loadingVideo = document.getElementById('loadingVideo');
+const loadingVideoFallback = document.getElementById('loadingVideoFallback');
 
-const MIN_DISPLAY_MS=4000;
+const MIN_DISPLAY_MS = 4000;
 function goToIntro(){
-loading.classList.add("hide");
-intro.classList.add("show");
+  loading.classList.add('hide');
+  intro.classList.add('show');
 }
 function startCountdownFromVideoReady(){
-setTimeout(goToIntro,MIN_DISPLAY_MS);
+  setTimeout(goToIntro, MIN_DISPLAY_MS);
 }
-if(loadingVideo && loadingVideo.readyState>=3){
-startCountdownFromVideoReady();
-}else if(loadingVideo){
-loadingVideo.addEventListener("canplaythrough",startCountdownFromVideoReady,{once:true});
-loadingVideo.addEventListener("error",()=>{
-  loadingVideo.style.display='none';
-  if(loadingVideoFallback){loadingVideoFallback.style.display='flex';}
+if (loadingVideo && loadingVideo.readyState >= 3) {
   startCountdownFromVideoReady();
-},{once:true});
-}else{
-startCountdownFromVideoReady();
+} else if (loadingVideo) {
+  loadingVideo.addEventListener('canplaythrough', startCountdownFromVideoReady, { once: true });
+  loadingVideo.addEventListener('error', () => {
+    loadingVideo.style.display = 'none';
+    if (loadingVideoFallback) {
+      loadingVideoFallback.style.display = 'flex';
+    }
+    startCountdownFromVideoReady();
+  }, { once: true });
+} else {
+  startCountdownFromVideoReady();
 }
 
-intro.addEventListener("click",()=>{
-intro.classList.add("hide");
-container.classList.add("show");
-document.body.style.overflow="auto";
+intro.addEventListener('click', () => {
+  intro.classList.add('hide');
+  container.classList.add('show');
+  document.body.style.overflow = 'auto';
 });
 </script>
 </body>
