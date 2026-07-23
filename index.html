@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portfolio</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#111;color:white;font-family:sans-serif;width:100%;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:40px;overflow:hidden;}
+#loading{position:fixed;top:0;left:0;width:100vw;height:100vh;background:black;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:30px;z-index:999999;opacity:1;visibility:visible;transition:opacity 1s ease,visibility 1s ease;}
+#loading.hide{opacity:0;visibility:hidden;pointer-events:none;}
+#loading video{width:630px;max-width:81vw;height:auto;object-fit:contain;display:block;}
+.loading-media{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;}
+.loading-video-fallback{display:none;min-width:280px;padding:24px 30px;border:1px solid rgba(255,255,255,.2);border-radius:16px;background:rgba(255,255,255,.06);color:white;text-align:center;font-size:18px;letter-spacing:2px;}
+.loading-text{color:white;font-size:22px;font-weight:300;letter-spacing:6px;text-transform:uppercase;opacity:1;text-shadow:0 0 12px rgba(255,255,255,.7);animation:blink 1.2s infinite;}
+@keyframes blink{0%{opacity:.3;}50%{opacity:1;}100%{opacity:.3;}}
+#intro{position:fixed;inset:0;background:black;display:flex;justify-content:center;align-items:center;z-index:999998;opacity:0;visibility:hidden;transition:opacity 1s ease,visibility 1s ease;}
+#intro.show{opacity:1;visibility:visible;}
+#intro.hide{opacity:0;visibility:hidden;pointer-events:none;}
+.intro-box{text-align:center;color:white;}
+.intro-box p{font-size:24px;line-height:1.8;opacity:.7;font-weight:300;}
+.intro-box span{display:block;margin-top:30px;font-size:14px;letter-spacing:4px;opacity:.4;animation:blink 1.5s infinite;}
+.container{width:100%;max-width:1100px;display:flex;flex-direction:column;align-items:center;gap:20px;opacity:0;visibility:hidden;pointer-events:none;transition:opacity 1s ease,visibility 1s ease;}
+.container.show{opacity:1;visibility:visible;pointer-events:auto;}
+.viewer{width:100%;min-height:51vh;background:#222;border-radius:16px;overflow:hidden;position:relative;box-shadow:0 10px 40px rgba(0,0,0,.5);cursor:pointer;display:flex;justify-content:center;align-items:center;}
+@media(min-width:900px){
+body{padding:20px;}
+.container{height:calc(100vh - 40px);justify-content:center;}
+.viewer{flex:1 1 auto;min-height:0;height:auto;}
+}
+.slide{width:100%;height:100%;display:none;align-items:center;justify-content:center;}
+.slide.active{display:flex;}
+.slide img{width:100%;height:100%;object-fit:contain;}
+.controls{display:flex;align-items:center;gap:20px;}
+button{padding:14px 28px;border:none;border-radius:10px;cursor:pointer;font-size:16px;background:white;color:black;transition:.2s;}
+button:hover{opacity:.8;transform:translateY(-2px);} 
+button:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+.page{opacity:.8;font-size:15px;}
+.fullscreen{position:fixed;inset:0;background:black;display:none;justify-content:center;align-items:center;z-index:9999;}
+.fullscreen.active{display:flex;}
+.fullscreen img{width:100%;height:100%;object-fit:contain;}
+.close-btn{position:absolute;top:20px;right:20px;background:white;color:black;border:none;padding:10px 16px;border-radius:10px;cursor:pointer;z-index:10000;}
+.pdf-loading-msg{color:white;opacity:.6;font-size:14px;}
+</style>
+</head>
+<body>
+
+<div id="loading">
+<div class="loading-media">
+<video id="loadingVideo" autoplay muted loop playsinline>
+<source src="video/mahouf10.mp4" type="video/mp4">
+</video>
+<div class="loading-video-fallback" id="loadingVideoFallback">動画ファイルが見つからないため、読み込み中の演出を切り替えています</div>
+</div>
+<div class="loading-text">Loading...</div>
+</div>
+
+<div id="intro">
+<div class="intro-box">
+<p>クリックで全画面表示すると<br>矢印キーで操作できます</p>
+<span>Click Anywhere</span>
+</div>
+</div>
+
+<div class="container" id="container">
+<div class="viewer" id="viewer">
+<div class="pdf-loading-msg" id="pdfLoadingMsg">PDFを読み込み中...</div>
+</div>
+<div class="page"><span id="pageNumber">1</span> / <span id="pageTotal">-</span></div>
+<div class="controls">
+<button id="prevBtn">戻る</button>
+<button id="nextBtn">進む</button>
+</div>
+</div>
+
+<div class="fullscreen" id="fullscreen">
+<button class="close-btn" id="closeBtn">閉じる</button>
+<img id="fullscreenImage">
+</div>
+
+<script>
+/* ============================================
+   ★ ここだけ変更すればOK ★
+
+   このファイルと同じ場所に置いた PDF_FILE の名前のPDFを
+   自動で読み込み、1ページ目から順番にスライドを作ります。
+   PDFを差し替えるだけで、ページ数や中身が全部入れ替わります。
+   ============================================ */
+const PDF_FILE = "portfolio.pdf";
+/* ============================================ */
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+const viewer = document.getElementById('viewer');
+const pageNumberEl = document.getElementById('pageNumber');
+const pageTotalEl = document.getElementById('pageTotal');
+const fullscreen = document.getElementById('fullscreen');
+const fullscreenImage = document.getElementById('fullscreenImage');
+
+let slides = [];
+let currentIndex = 0;
+let controlsReady = false;
+
+function showSlide(index){
+  if (!slides.length) return;
+  const safeIndex = (index + slides.length) % slides.length;
+  slides.forEach(slide => slide.classList.remove('active'));
+  slides[safeIndex].classList.add('active');
+  currentIndex = safeIndex;
+  pageNumberEl.textContent = safeIndex + 1;
+  if (fullscreen.classList.contains('active')) {
+    const img = slides[safeIndex].querySelector('img');
+    if (img) fullscreenImage.src = img.src;
+  }
+}
+
+function setupControls(){
+  if (controlsReady) return;
+  controlsReady = true;
+
+  document.getElementById('nextBtn').addEventListener('click', () => {
+    showSlide(currentIndex + 1);
+  });
+
+  document.getElementById('prevBtn').addEventListener('click', () => {
+    showSlide(currentIndex - 1);
+  });
+
+  viewer.addEventListener('click', () => {
+    if (!slides.length) return;
+    const img = slides[currentIndex].querySelector('img');
+    if (img) {
+      fullscreenImage.src = img.src;
+      fullscreen.classList.add('active');
+    }
+  });
+
+  document.getElementById('closeBtn').addEventListener('click', () => {
+    fullscreen.classList.remove('active');
+  });
+
+  fullscreen.addEventListener('click', (e) => {
+    if (e.target === fullscreen) fullscreen.classList.remove('active');
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (!fullscreen.classList.contains('active')) return;
+    if (e.key === 'ArrowRight') {
+      showSlide(currentIndex + 1);
+    }
+    if (e.key === 'ArrowLeft') {
+      showSlide(currentIndex - 1);
+    }
+    if (e.key === 'Escape') {
+      fullscreen.classList.remove('active');
+    }
+  });
+}
+
+async function buildSlidesFromPdf(){
+  const pdfLoadingMsg = document.getElementById('pdfLoadingMsg');
+  const nextBtn = document.getElementById('nextBtn');
+  const prevBtn = document.getElementById('prevBtn');
+
+  try {
+    const pdf = await pdfjsLib.getDocument(PDF_FILE).promise;
+    const numPages = pdf.numPages;
+
+    viewer.innerHTML = '';
+
+    for (let i = 1; i <= numPages; i++) {
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 2 });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+
+      const slide = document.createElement('div');
+      slide.className = 'slide' + (i === 1 ? ' active' : '');
+      const img = document.createElement('img');
+      img.src = canvas.toDataURL('image/jpeg', 0.92);
+      slide.appendChild(img);
+      viewer.appendChild(slide);
+    }
+
+    slides = Array.from(document.querySelectorAll('.slide'));
+    pageTotalEl.textContent = numPages;
+    nextBtn.disabled = false;
+    prevBtn.disabled = false;
+    if (slides.length) {
+      showSlide(0);
+    }
+    setupControls();
+  } catch (err) {
+    viewer.innerHTML = '';
+    const fallbackSlide = document.createElement('div');
+    fallbackSlide.className = 'slide active';
+    const fallbackImg = document.createElement('img');
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='1600'><rect width='100%' height='100%' fill='#181818'/><rect x='80' y='120' width='1040' height='1360' rx='24' fill='#222'/><rect x='160' y='240' width='760' height='54' rx='12' fill='#fff' opacity='0.18'/><rect x='160' y='340' width='620' height='38' rx='12' fill='#fff' opacity='0.12'/><rect x='160' y='430' width='680' height='38' rx='12' fill='#fff' opacity='0.12'/><rect x='160' y='520' width='560' height='38' rx='12' fill='#fff' opacity='0.1'/><text x='600' y='1040' text-anchor='middle' font-family='Arial, sans-serif' font-size='44' fill='#fff'>PDFを配置してください</text></svg>`;
+    fallbackImg.src = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+    fallbackSlide.appendChild(fallbackImg);
+    viewer.appendChild(fallbackSlide);
+    slides = [fallbackSlide];
+    pageTotalEl.textContent = '1';
+    pageNumberEl.textContent = '1';
+    nextBtn.disabled = true;
+    prevBtn.disabled = true;
+    setupControls();
+    pdfLoadingMsg.textContent = 'PDFの読み込みに失敗しました。ファイル名やパスを確認してください。';
+    console.error(err);
+  }
+}
+
+nextBtn.disabled = true;
+prevBtn.disabled = true;
+buildSlidesFromPdf();
+
+const loading=document.getElementById("loading");
+const intro=document.getElementById("intro");
+const container=document.getElementById("container");
+const loadingVideo=document.getElementById("loadingVideo");
+const loadingVideoFallback=document.getElementById("loadingVideoFallback");
+
+const MIN_DISPLAY_MS=4000;
+function goToIntro(){
+loading.classList.add("hide");
+intro.classList.add("show");
+}
+function startCountdownFromVideoReady(){
+setTimeout(goToIntro,MIN_DISPLAY_MS);
+}
+if(loadingVideo && loadingVideo.readyState>=3){
+startCountdownFromVideoReady();
+}else if(loadingVideo){
+loadingVideo.addEventListener("canplaythrough",startCountdownFromVideoReady,{once:true});
+loadingVideo.addEventListener("error",()=>{
+  loadingVideo.style.display='none';
+  if(loadingVideoFallback){loadingVideoFallback.style.display='flex';}
+  startCountdownFromVideoReady();
+},{once:true});
+}else{
+startCountdownFromVideoReady();
+}
+
+intro.addEventListener("click",()=>{
+intro.classList.add("hide");
+container.classList.add("show");
+document.body.style.overflow="auto";
+});
+</script>
+</body>
+</html>
