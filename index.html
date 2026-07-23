@@ -30,7 +30,7 @@ body{background:#111;color:white;font-family:sans-serif;width:100%;min-height:10
 .slide img{width:100%;height:100%;object-fit:contain;}
 .controls{display:flex;align-items:center;gap:20px;}
 button{padding:14px 28px;border:none;border-radius:10px;cursor:pointer;font-size:16px;background:white;color:black;transition:.2s;}
-button:hover{opacity:.8;transform:translateY(-2px);} 
+button:hover{opacity:.8;transform:translateY(-2px);}
 button:disabled{opacity:.5;cursor:not-allowed;transform:none;}
 .page{opacity:.8;font-size:15px;}
 .fullscreen{position:fixed;inset:0;background:black;display:none;justify-content:center;align-items:center;z-index:9999;}
@@ -64,8 +64,8 @@ button:disabled{opacity:.5;cursor:not-allowed;transform:none;}
 </div>
 <div class="page"><span id="pageNumber">1</span> / <span id="pageTotal">-</span></div>
 <div class="controls">
-<button id="prevBtn">戻る</button>
-<button id="nextBtn">進む</button>
+<button id="prevBtn" disabled>戻る</button>
+<button id="nextBtn" disabled>進む</button>
 </div>
 </div>
 
@@ -92,6 +92,8 @@ const pageNumberEl = document.getElementById('pageNumber');
 const pageTotalEl = document.getElementById('pageTotal');
 const fullscreen = document.getElementById('fullscreen');
 const fullscreenImage = document.getElementById('fullscreenImage');
+const nextBtn = document.getElementById('nextBtn');
+const prevBtn = document.getElementById('prevBtn');
 
 let slides = [];
 let currentIndex = 0;
@@ -114,11 +116,11 @@ function setupControls(){
   if (controlsReady) return;
   controlsReady = true;
 
-  document.getElementById('nextBtn').addEventListener('click', () => {
+  nextBtn.addEventListener('click', () => {
     showSlide(currentIndex + 1);
   });
 
-  document.getElementById('prevBtn').addEventListener('click', () => {
+  prevBtn.addEventListener('click', () => {
     showSlide(currentIndex - 1);
   });
 
@@ -155,11 +157,13 @@ function setupControls(){
 
 async function buildSlidesFromPdf(){
   const pdfLoadingMsg = document.getElementById('pdfLoadingMsg');
-  const nextBtn = document.getElementById('nextBtn');
-  const prevBtn = document.getElementById('prevBtn');
 
   try {
-    const pdf = await pdfjsLib.getDocument(PDF_FILE).promise;
+    const pdf = await pdfjsLib.getDocument({
+      url: PDF_FILE,
+      cMapUrl: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/",
+      cMapPacked: true,
+    }).promise;
     const numPages = pdf.numPages;
 
     viewer.innerHTML = '';
@@ -209,8 +213,6 @@ async function buildSlidesFromPdf(){
   }
 }
 
-nextBtn.disabled = true;
-prevBtn.disabled = true;
 buildSlidesFromPdf();
 
 const loading = document.getElementById('loading');
